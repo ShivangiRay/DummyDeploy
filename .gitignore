@@ -1,0 +1,7 @@
+frontend/node_modules/
+frontend/.next/
+frontend/tsconfig.tsbuildinfo
+backend/.venv/
+backend/mock_api.db
+__pycache__/
+*.pyc

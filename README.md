@@ -25,9 +25,11 @@ backend/   FastAPI + SQLite dynamic mock service
 
 Prerequisites: Node.js 18+ and Python 3.11+ (Python 3.14 is supported with the current dependency ranges).
 
+From the repository root, open **two terminals**. Do not run both servers in the same terminal.
+
 ```bash
-# Terminal 1 — API server
-cd backend
+# Terminal 1 — FastAPI mock server
+cd /Users/shivangi/Documents/GitProjects/DummyDeploy/backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -35,13 +37,46 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 ```bash
-# Terminal 2 — web app
-cd frontend
+# Terminal 2 — Next.js web app
+cd /Users/shivangi/Documents/GitProjects/DummyDeploy/frontend
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Set `NEXT_PUBLIC_API_URL` if the FastAPI service is hosted somewhere other than `http://localhost:8000`.
+When both commands are running, open [http://localhost:3000](http://localhost:3000). The frontend expects the API server at `http://localhost:8000`; set `NEXT_PUBLIC_API_URL` before `npm run dev` only if the API runs elsewhere.
+
+## Quick test
+
+1. Open `http://localhost:3000` and keep the sample schema.
+2. Click **Deploy**. The app creates a project and fills the Playground URL.
+3. Select **Playground**, choose `GET`, and click **Send**.
+4. Confirm the response has status `200` and body:
+
+```json
+{"data": []}
+```
+
+To test the deployed API outside the browser, copy the project ID from the deploy message and run:
+
+```bash
+curl http://localhost:8000/projects/PROJECT_ID/api/users
+```
+
+The generated Swagger UI is available at:
+
+```text
+http://localhost:8000/projects/PROJECT_ID/docs
+```
+
+To test the sample `POST /users` endpoint:
+
+```bash
+curl -X POST http://localhost:8000/projects/PROJECT_ID/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Ada"}'
+```
+
+Mock responses are configured by the schema. Request bodies are accepted but do not change which response the server returns.
 
 ## Example schema
 

@@ -10,8 +10,9 @@ MockForge is a full-stack developer tool for defining, publishing, testing, and 
 - SQLite-backed FastAPI mock server
 - Public runtime routes for `GET`, `POST`, `PUT`, and `DELETE`
 - Generated OpenAPI JSON and project-specific Swagger UI
-- Deploy, clone, and clipboard sharing controls
+- Deploy, clone, reload, and clipboard sharing controls
 - Owner-token protection for mock-data updates and cloning; public mock routes stay callable by anyone
+- Per-endpoint response editor for JSON payloads, status codes, headers, and simulated latency
 - Responsive Tailwind interface and a dashboard of created projects
 
 ## Project layout
@@ -78,6 +79,12 @@ curl -X POST http://localhost:8000/projects/PROJECT_ID/api/users \
 
 Mock responses are configured by the schema. Request bodies are accepted but do not change which response the server returns.
 
+## Editing a deployed mock
+
+Choose an endpoint in the sidebar and open **Playground**. Owners can use the **Mock response** panel to update the response JSON, status code, response headers, and an optional delay (up to 30 seconds), then save without redeploying. The updated settings are served immediately and are reflected in the generated OpenAPI document.
+
+Owner tokens are saved only in the browser's local storage. Loading a project created in another browser remains public for testing and documentation, but editing and cloning require its original owner token.
+
 ## Example schema
 
 ```json
@@ -85,7 +92,7 @@ Mock responses are configured by the schema. Request bodies are accepted but do 
   "name": "User Service",
   "basePath": "/api",
   "endpoints": [
-    { "method": "GET", "path": "/users", "response": { "data": [] }, "status": 200 },
+    { "method": "GET", "path": "/users", "response": { "data": [] }, "status": 200, "headers": { "X-Mock-Source": "MockForge" }, "delayMs": 0 },
     { "method": "POST", "path": "/users", "response": { "id": 1, "name": "John" }, "status": 201 }
   ]
 }

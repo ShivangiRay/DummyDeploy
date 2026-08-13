@@ -4,6 +4,7 @@ import json
 import os
 import secrets
 import sqlite3
+import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -41,10 +42,17 @@ def init_db() -> None:
         CREATE TABLE IF NOT EXISTS mocks (
           id INTEGER PRIMARY KEY AUTOINCREMENT, project_id TEXT NOT NULL,
           method TEXT NOT NULL, path TEXT NOT NULL, response_json TEXT NOT NULL,
-          status INTEGER NOT NULL, UNIQUE(project_id, method, path),
+          status INTEGER NOT NULL, headers_json TEXT NOT NULL DEFAULT '{}',
+          delay_ms INTEGER NOT NULL DEFAULT 0, UNIQUE(project_id, method, path),
           FOREIGN KEY(project_id) REFERENCES projects(id)
         );
         """)
+        # Existing local databases are upgraded in place.
+        columns = {column["name"] for column in conn.execute("PRAGMA table_info(mocks)")}
+        if "headers_json" not in columns:
+            conn.execute("ALTER TABLE mocks ADD COLUMN headers_json TEXT NOT NULL DEFAULT '{}'")
+        if "delay_ms" not in columns:
+            conn.execute("ALTER TABLE mocks ADD COLUMN delay_ms INTEGER NOT NULL DEFAULT 0")
 
 
 class EndpointSchema(BaseModel):
@@ -52,6 +60,8 @@ class EndpointSchema(BaseModel):
     path: str = Field(min_length=1)
     response: Any = {}
     status: int = Field(default=200, ge=100, le=599)
+    headers: dict[str, str] = Field(default_factory=dict)
+    delayMs: int = Field(default=0, ge=0, le=30000)
 
     @field_validator("path")
     @classmethod
@@ -79,6 +89,8 @@ class ResponseUpdate(BaseModel):
     method: Literal["GET", "POST", "PUT", "DELETE"]
     response: Any
     status: int = Field(ge=100, le=599, default=200)
+    headers: dict[str, str] = Field(default_factory=dict)
+    delayMs: int = Field(default=0, ge=0, le=30000)
 
 
 def get_project(project_id: str) -> sqlite3.Row:
@@ -106,8 +118,8 @@ def write_project(schema: ProjectSchema, project_id: str | None = None, token: s
             (project_id, schema.name, schema.basePath, json.dumps(schema_data), token, datetime.now(timezone.utc).isoformat()),
         )
         conn.executemany(
-            "INSERT INTO mocks (project_id,method,path,response_json,status) VALUES (?,?,?,?,?)",
-            [(project_id, e.method, e.path, json.dumps(e.response), e.status) for e in schema.endpoints],
+            "INSERT INTO mocks (project_id,method,path,response_json,status,headers_json,delay_ms) VALUES (?,?,?,?,?,?,?)",
+            [(project_id, e.method, e.path, json.dumps(e.response), e.status, json.dumps(e.headers), e.delayMs) for e in schema.endpoints],
         )
     return project_id, token
 
@@ -152,7 +164,18 @@ def clone_project(project_id: str, request: Request, _: sqlite3.Row = Depends(re
 @app.put("/projects/{project_id}/mocks")
 def update_mock(project_id: str, update: ResponseUpdate, _: sqlite3.Row = Depends(require_owner)) -> dict[str, str]:
     with db() as conn:
-        result = conn.execute("UPDATE mocks SET response_json=?, status=? WHERE project_id=? AND method=? AND path=?", (json.dumps(update.response), update.status, project_id, update.method, update.path))
+        result = conn.execute(
+            "UPDATE mocks SET response_json=?, status=?, headers_json=?, delay_ms=? WHERE project_id=? AND method=? AND path=?",
+            (json.dumps(update.response), update.status, json.dumps(update.headers), update.delayMs, project_id, update.method, update.path),
+        )
+        if result.rowcount:
+            project = conn.execute("SELECT schema_json FROM projects WHERE id=?", (project_id,)).fetchone()
+            schema = json.loads(project["schema_json"])
+            for endpoint in schema["endpoints"]:
+                if endpoint["method"] == update.method and endpoint["path"] == update.path:
+                    endpoint.update(update.model_dump(mode="json"))
+                    break
+            conn.execute("UPDATE projects SET schema_json=? WHERE id=?", (json.dumps(schema), project_id))
     if not result.rowcount:
         raise HTTPException(404, "Mock endpoint not found")
     return {"message": "Mock response updated"}
@@ -191,7 +214,9 @@ def serve_mock(project_id: str, requested_path: str, request: Request) -> JSONRe
     else:
         raise HTTPException(404, "Mock endpoint not found")
     with db() as conn:
-        mock = conn.execute("SELECT response_json,status FROM mocks WHERE project_id=? AND method=? AND path=?", (project_id, request.method, endpoint_path)).fetchone()
+        mock = conn.execute("SELECT response_json,status,headers_json,delay_ms FROM mocks WHERE project_id=? AND method=? AND path=?", (project_id, request.method, endpoint_path)).fetchone()
     if not mock:
         raise HTTPException(404, "Mock endpoint not found")
-    return JSONResponse(content=json.loads(mock["response_json"]), status_code=mock["status"])
+    if mock["delay_ms"]:
+        time.sleep(mock["delay_ms"] / 1000)
+    return JSONResponse(content=json.loads(mock["response_json"]), status_code=mock["status"], headers=json.loads(mock["headers_json"]))

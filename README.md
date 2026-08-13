@@ -79,6 +79,17 @@ curl -X POST http://localhost:8000/projects/PROJECT_ID/api/users \
 
 Mock responses are configured by the schema. Request bodies are accepted but do not change which response the server returns.
 
+## Daily GitHub activity
+
+This repository includes a scheduled GitHub Action at `.github/workflows/daily-activity.yml`. At **00:00 Asia/Kolkata** each day, it commits a dated file under `activity/daily/` to `main`. The workflow can also be run immediately from the repository's **Actions** tab using **Run workflow**.
+
+Before the first run, add these repository Actions secrets in **Settings → Secrets and variables → Actions**:
+
+- `COMMIT_AUTHOR_EMAIL` (required): an email address verified on your GitHub account. This makes the commit eligible for your GitHub contribution graph.
+- `COMMIT_AUTHOR_NAME` (optional): the displayed commit author name; it defaults to `GitHub Activity Bot`.
+
+The repository must stay public, or you must enable private-contribution display in your GitHub profile settings, for the activity to appear publicly on your profile.
+
 ## Editing a deployed mock
 
 Choose an endpoint in the sidebar and open **Playground**. Owners can use the **Mock response** panel to update the response JSON, status code, response headers, and an optional delay (up to 30 seconds), then save without redeploying. The updated settings are served immediately and are reflected in the generated OpenAPI document.

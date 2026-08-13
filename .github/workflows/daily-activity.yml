@@ -1,0 +1,48 @@
+name: Daily profile activity
+
+on:
+  schedule:
+    # 00:00 Asia/Kolkata (18:30 UTC on the previous day)
+    - cron: "30 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-profile-activity
+  cancel-in-progress: false
+
+jobs:
+  commit-activity:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the default branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Create today's activity entry
+        run: |
+          DATE="$(TZ=Asia/Kolkata date +'%Y-%m-%d')"
+          mkdir -p activity/daily
+          printf '# Daily activity\n\nRecorded on %s (Asia/Kolkata).\n' "$DATE" > "activity/daily/$DATE.md"
+
+      - name: Commit and push
+        env:
+          COMMIT_AUTHOR_EMAIL: ${{ secrets.COMMIT_AUTHOR_EMAIL }}
+          COMMIT_AUTHOR_NAME: ${{ secrets.COMMIT_AUTHOR_NAME }}
+        run: |
+          if [ -z "$COMMIT_AUTHOR_EMAIL" ]; then
+            echo "COMMIT_AUTHOR_EMAIL is not configured. Add it as a repository Actions secret before enabling the schedule."
+            exit 1
+          fi
+          git config user.name "${COMMIT_AUTHOR_NAME:-GitHub Activity Bot}"
+          git config user.email "$COMMIT_AUTHOR_EMAIL"
+          git add activity/daily
+          if git diff --cached --quiet; then
+            echo "Today's activity entry already exists."
+            exit 0
+          fi
+          git commit -m "chore: record daily activity"
+          git push origin main

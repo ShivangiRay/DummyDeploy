@@ -85,7 +85,7 @@ This repository includes a scheduled GitHub Action at `.github/workflows/daily-a
 
 Before the first run, add these repository Actions secrets in **Settings → Secrets and variables → Actions**:
 
-- `COMMIT_AUTHOR_EMAIL` (required): an email address verified on your GitHub account. This makes the commit eligible for your GitHub contribution graph.
+- `COMMIT_AUTHOR_EMAIL` (required): an email address verified on your GitHub account, written with `@` (for example, `name@example.com`). This makes the commit eligible for your GitHub contribution graph.
 - `COMMIT_AUTHOR_NAME` (optional): the displayed commit author name; it defaults to `GitHub Activity Bot`.
 
 The repository must stay public, or you must enable private-contribution display in your GitHub profile settings, for the activity to appear publicly on your profile.

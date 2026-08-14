@@ -37,6 +37,13 @@ jobs:
             echo "COMMIT_AUTHOR_EMAIL is not configured. Add it as a repository Actions secret before enabling the schedule."
             exit 1
           fi
+          case "$COMMIT_AUTHOR_EMAIL" in
+            *@*) ;;
+            *)
+              echo "COMMIT_AUTHOR_EMAIL must be a valid email address containing '@'. Update the repository secret."
+              exit 1
+              ;;
+          esac
           git config user.name "${COMMIT_AUTHOR_NAME:-GitHub Activity Bot}"
           git config user.email "$COMMIT_AUTHOR_EMAIL"
           git add activity/daily
